@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Catatan Keuangan Mahasiswa</title>
+
+  <!-- Pasang tema tersimpan SEBELUM halaman tampil, supaya tidak berkedip -->
+  <script>
+    try {
+      document.documentElement.setAttribute('data-tema',
+        localStorage.getItem('tema-aplikasi') === 'terang' ? 'terang' : 'gelap');
+    } catch (e) {
+      document.documentElement.setAttribute('data-tema', 'gelap');
+    }
+  </script>
+
+  <!-- Tailwind CSS lewat CDN: tidak perlu instalasi, cukup satu tag script -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Plus Jakarta Sans (opsional, ada fallback bila offline) -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ===== TEMA: semua warna dikumpulkan di sini sebagai variabel ===== */
+    /* Tema gelap = Midnight Blue (bawaan) */
+    :root {
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      color-scheme: dark;
+      --bg: #0f172a;                         /* latar halaman */
+      --kartu: #1e293b;                      /* latar kartu */
+      --kolom: #0f172a;                      /* latar kolom isian */
+      --garis: rgba(255, 255, 255, 0.10);    /* garis tepi */
+      --teks: #f8fafc;                       /* teks utama */
+      --redup: #94a3b8;                      /* teks label */
+      --sunyi: #8393a9;                      /* teks kecil/keterangan */
+      --masuk: #7dd3fc;                      /* warna pemasukan */
+      --masuk-garis: rgba(125, 211, 252, 0.28);
+      --keluar: #fb7185;                     /* warna pengeluaran */
+      --keluar-garis: rgba(251, 113, 133, 0.28);
+      --teks-tombol: #0f172a;                /* teks di atas tombol berwarna */
+    }
+    /* Tema terang = Clean Light */
+    :root[data-tema="terang"] {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --kartu: #ffffff;
+      --kolom: #f1f5f9;
+      --garis: rgba(15, 23, 42, 0.14);
+      --teks: #0f172a;
+      --redup: #475569;
+      --sunyi: #64748b;
+      --masuk: #047857;
+      --masuk-garis: rgba(4, 120, 87, 0.35);
+      --keluar: #e11d48;
+      --keluar-garis: rgba(225, 29, 72, 0.35);
+      --teks-tombol: #ffffff;
+    }
+
+    html { background: var(--bg); scroll-padding-top: env(safe-area-inset-top, 0px); }
+    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+           background: var(--bg); color: var(--teks); }
+
+    /* Kelas warna buatan sendiri, memakai variabel di atas ("html" di depan = prioritas lebih tinggi dari reset Tailwind) */
+    html .bg-kartu { background: var(--kartu); }
+    html .bg-kolom { background: var(--kolom); }
+    html .bg-masuk { background: var(--masuk); }
+    html .bg-keluar { background: var(--keluar); }
+    html .garis-warna { border-color: var(--garis); }
+    html .garis-masuk { border-color: var(--masuk-garis); }
+    html .garis-keluar { border-color: var(--keluar-garis); }
+    html .teks-utama { color: var(--teks); }
+    html .teks-redup { color: var(--redup); }
+    html .teks-sunyi { color: var(--sunyi); }
+    html .teks-masuk { color: var(--masuk); }
+    html .teks-keluar { color: var(--keluar); }
+    html .teks-tombol { color: var(--teks-tombol); }
+    html .tombol-netral { background: var(--teks); color: var(--bg); }
+    html .fokus-masuk:focus { border-color: var(--masuk); }
+    html .hover-utama:hover { color: var(--teks); }
+    html .hover-keluar:hover { color: var(--keluar); border-color: var(--keluar-garis); }
+    html .placeholder-sunyi::placeholder { color: var(--sunyi); opacity: 0.75; }
+
+    /* Hilangkan panah naik-turun pada input angka (dipakai kolom tahun sendiri) */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+  <!-- ===== Layar 1: Memuat (tampil sebentar saat mengecek status login) ===== -->
+  <div id="layarMuat" class="min-h-screen flex items-center justify-center teks-redup">Memuat...</div>
+
+  <!-- ===== Layar 2: Login ===== -->
+  <main id="layarLogin" class="hidden max-w-xl mx-auto px-4 pt-6 pb-16">
+    <div class="flex justify-end mb-12">
+      <button type="button" class="btn-tema shrink-0 min-h-[44px] px-3 rounded-xl border garis-warna text-sm teks-redup hover-utama transition"></button>
+    </div>
+    <h1 class="text-3xl font-extrabold teks-utama">Catatan Keuangan <span class="teks-masuk">Mahasiswa</span></h1>
+    <p class="teks-redup mt-2">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+
+    <div class="mt-8 rounded-2xl bg-kartu border garis-warna p-5">
+      <h2 id="judulLogin" class="text-lg font-bold teks-utama">Masuk dulu</h2>
+      <p class="text-sm teks-redup mt-1">
+        Buat akun atau masuk agar catatanmu tersimpan di server dan tidak hilang
+        walaupun data browser dihapus.
+      </p>
+      <form id="formLogin" class="mt-5 space-y-4" novalidate>
+        <div>
+          <label for="inUser" class="block text-sm teks-redup mb-1">Nama pengguna</label>
+          <input id="inUser" type="text" maxlength="30" autocomplete="username" autocapitalize="none"
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+        </div>
+        <div>
+          <label for="inSandi" class="block text-sm teks-redup mb-1">Kata sandi</label>
+          <input id="inSandi" type="password" maxlength="128" autocomplete="current-password"
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+        </div>
+        <button type="submit" id="btnMasuk"
+          class="w-full min-h-[52px] rounded-xl tombol-netral font-bold transition active:scale-[0.98] disabled:opacity-50">Masuk</button>
+        <button type="button" id="btnGantiMode"
+          class="w-full min-h-[44px] text-sm teks-redup hover-utama transition">Belum punya akun? Daftar</button>
+      </form>
+      <p id="pesanLogin" class="hidden mt-3 text-sm teks-keluar" role="alert"></p>
+    </div>
+  </main>
+
+  <!-- ===== Layar 3: Aplikasi (tampil setelah login) ===== -->
+  <main id="layarApp" class="hidden max-w-xl mx-auto px-4 pb-16 pt-6">
+
+    <!-- ===== Header ===== -->
+    <header class="mb-6 flex items-start justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-extrabold teks-utama">Catatan Keuangan <span class="teks-masuk">Mahasiswa</span></h1>
+        <p class="text-sm teks-redup">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+      </div>
+      <button id="btnKeluar"
+        class="shrink-0 min-h-[44px] px-4 rounded-xl border garis-warna text-sm teks-redup hover-utama transition">Keluar</button>
+    </header>
+    <div class="-mt-3 mb-5 flex items-center justify-between gap-3">
+      <p id="infoAkun" class="min-w-0 text-xs teks-sunyi truncate"></p>
+      <button type="button" class="btn-tema shrink-0 min-h-[44px] px-3 rounded-xl border garis-warna text-sm teks-redup hover-utama transition"></button>
+    </div>
+    <p id="pesanCloud" class="hidden mb-4 text-sm teks-keluar" role="alert"></p>
+    <!-- Status sinkronisasi: menunjukkan apakah data benar-benar sudah tersimpan di cloud -->
+    <p id="statusCloud" class="mb-4 text-xs teks-sunyi" aria-live="polite"></p>
+
+    <!-- ===== Ringkasan Dompet: 3 kartu ===== -->
+    <section class="grid grid-cols-2 gap-3 mb-6">
+      <div class="col-span-2 rounded-2xl bg-kartu border garis-warna p-5">
+        <p class="text-sm teks-redup">Total saldo saat ini</p>
+        <p id="saldo" class="text-3xl font-extrabold teks-utama mt-1 break-words">Rp 0</p>
+      </div>
+      <div class="rounded-2xl bg-kartu border garis-masuk p-4">
+        <p id="labelMasuk" class="text-sm teks-redup">Pemasukan</p>
+        <p id="totalMasuk" class="text-lg font-bold teks-masuk mt-1 break-words">Rp 0</p>
+      </div>
+      <div class="rounded-2xl bg-kartu border garis-keluar p-4">
+        <p id="labelKeluar" class="text-sm teks-redup">Pengeluaran</p>
+        <p id="totalKeluar" class="text-lg font-bold teks-keluar mt-1 break-words">Rp 0</p>
+      </div>
+    </section>
+
+    <!-- ===== Form Transaksi ===== -->
+    <section class="rounded-2xl bg-kartu border garis-warna p-5 mb-6">
+      <h2 id="judulForm" class="text-lg font-bold teks-utama">Catat transaksi</h2>
+      <!-- Jam berjalan: menunjukkan waktu saat ini (waktu ini yang dicatat saat transaksi disimpan) -->
+      <p id="jamLive" class="text-xs teks-sunyi mt-1 mb-4" aria-live="off"></p>
+
+      <form id="formTransaksi" class="space-y-4" novalidate>
+
+        <!-- Pilihan tipe -->
+        <div class="grid grid-cols-2 gap-2 bg-kolom p-1 rounded-xl" role="group" aria-label="Tipe transaksi">
+          <button type="button" id="btnPengeluaran" data-tipe="pengeluaran"
+            class="tipe-btn min-h-[48px] rounded-lg font-semibold transition">Pengeluaran</button>
+          <button type="button" id="btnPemasukan" data-tipe="pemasukan"
+            class="tipe-btn min-h-[48px] rounded-lg font-semibold transition">Pemasukan</button>
+        </div>
+
+        <div>
+          <label for="judul" class="block text-sm teks-redup mb-1">Judul transaksi</label>
+          <input id="judul" type="text" maxlength="60" placeholder="Contoh: Makan siang warteg"
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+        </div>
+
+        <div>
+          <label for="nominal" class="block text-sm teks-redup mb-1">Nominal (Rupiah)</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 teks-sunyi">Rp</span>
+            <!-- type="text" (bukan number) supaya titik ribuan bisa tampil; inputmode="numeric" memunculkan keypad angka di HP -->
+            <input id="nominal" type="text" inputmode="numeric" autocomplete="off" maxlength="17" placeholder="0"
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna pl-12 pr-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+          </div>
+        </div>
+
+        <div>
+          <label for="kategori" class="block text-sm teks-redup mb-1">Kategori</label>
+          <select id="kategori"
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama focus:outline-none fokus-masuk">
+            <option value="Pengeluaran">Pengeluaran</option>
+            <option value="Pemasukan">Pemasukan</option>
+          </select>
+        </div>
+
+        <!-- Tanggal, bulan, tahun (otomatis terisi hari ini) -->
+        <div class="grid grid-cols-[4.5rem_1fr_5.5rem] gap-2">
+          <div>
+            <label for="tanggal" class="block text-sm teks-redup mb-1">Tanggal</label>
+            <select id="tanggal"
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-2 teks-utama focus:outline-none fokus-masuk"></select>
+          </div>
+          <div>
+            <label for="bulan" class="block text-sm teks-redup mb-1">Bulan</label>
+            <select id="bulan"
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-3 teks-utama focus:outline-none fokus-masuk"></select>
+          </div>
+          <div>
+            <label for="tahun" class="block text-sm teks-redup mb-1">Tahun</label>
+            <select id="tahun"
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-2 teks-utama focus:outline-none fokus-masuk"></select>
+          </div>
+        </div>
+
+        <!-- Muncul hanya bila "Lainnya" dipilih di kolom tahun -->
+        <input id="tahunLain" type="number" inputmode="numeric" min="1900" max="2100"
+          placeholder="Ketik tahun sendiri, contoh: 2035"
+          class="hidden w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+
+        <p id="pesanError" class="hidden text-sm teks-keluar" role="alert"></p>
+
+        <button type="submit" id="btnSimpan"
+          class="w-full min-h-[52px] rounded-xl font-bold teks-tombol transition active:scale-[0.98]">Simpan transaksi</button>
+        <!-- Muncul hanya saat mode ubah -->
+        <button type="button" id="btnBatal"
+          class="hidden w-full min-h-[48px] rounded-xl border garis-warna teks-redup hover-utama transition">Batal ubah</button>
+      </form>
+    </section>
+
+    <!-- ===== Riwayat Transaksi ===== -->
+    <section>
+      <h2 class="text-lg font-bold teks-utama mb-3">Riwayat transaksi</h2>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <select id="filterBulan" aria-label="Filter bulan"
+          class="w-full min-h-[48px] rounded-xl bg-kartu border garis-warna px-4 teks-utama focus:outline-none fokus-masuk"></select>
+        <select id="filterTahun" aria-label="Filter tahun"
+          class="w-full min-h-[48px] rounded-xl bg-kartu border garis-warna px-4 teks-utama focus:outline-none fokus-masuk"></select>
+      </div>
+      <ul id="daftar" class="space-y-2"></ul>
+      <p id="kosong" class="hidden text-center teks-sunyi py-8"></p>
+    </section>
+  </main>
+
+  <!-- ===== Jendela Detail Transaksi ===== -->
+  <div id="modalDetail" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+       style="background: rgba(0,0,0,0.6)" role="dialog" aria-modal="true" aria-labelledby="detailJudul">
+    <div class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-kartu border garis-warna p-5">
+      <div class="flex items-start justify-between gap-3">
+        <h2 id="detailJudul" class="text-lg font-bold teks-utama break-words min-w-0">Detail transaksi</h2>
+        <button type="button" id="detailTutup" aria-label="Tutup"
+          class="shrink-0 min-h-[44px] min-w-[44px] rounded-lg border garis-warna teks-redup hover-utama transition">&#10005;</button>
+      </div>
+      <p id="detailNominal" class="text-2xl font-extrabold mt-2 break-words"></p>
+      <dl id="detailIsi" class="mt-4 space-y-3 text-sm"></dl>
+      <div class="grid grid-cols-2 gap-2 mt-5">
+        <button type="button" id="detailUbah"
+          class="min-h-[48px] rounded-xl tombol-netral font-semibold transition active:scale-[0.98]">Ubah</button>
+        <button type="button" id="detailHapus"
+          class="min-h-[48px] rounded-xl border garis-warna teks-redup hover-keluar transition">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logika frontend: berbicara dengan backend Python lewat fetch() -->
+  <script>
+    /* =========================================================
+       Catatan Keuangan Mahasiswa - logika tampilan (frontend)
+       Alur kerja singkat:
+       1. Pengguna daftar / masuk dengan nama pengguna dan kata sandi (diperiksa Flask di app.py).
+       2. Transaksi disimpan server di database SQLite, terpisah per akun.
+       3. Browser memanggil API lewat fetch():
+          GET (baca), POST (tambah), PUT (ubah), DELETE (hapus).
+          Setelah itu daftar dimuat ulang dari server dan digambar ulang.
+       ========================================================= */
+
+    // ---------- 0. KOMUNIKASI DENGAN BACKEND PYTHON ----------
+    // Semua data disimpan oleh server Flask (app.py). Browser hanya mengirim dan menerima JSON lewat fetch().
+    async function api(metode, alamat, data) {
+      let respons;
+      try {
+        respons = await fetch(alamat, {
+          method: metode,
+          headers: { 'Content-Type': 'application/json' },
+          body: data ? JSON.stringify(data) : undefined
+        });
+      } catch (e) {
+        const err = new Error('Tidak bisa terhubung ke server. Pastikan app.py sedang berjalan.');
+        err.kode = 'jaringan';
+        throw err;
+      }
+      let isi = {};
+      try { isi = await respons.json(); } catch (e) { /* respons bukan JSON */ }
+      if (!respons.ok) {
+        const err = new Error(isi.pesan || ('Terjadi kesalahan (' + respons.status + ').'));
+        err.kode = respons.status;
+        throw err;
+      }
+      return isi;
+    }
+
+    // ---------- 1. DATA & KONSTANTA ----------
+    const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const TAHUN_AWAL = 2026;
+    const TAHUN_AKHIR = 2030;
+
+    let transaksi = [];          // isi diambil dari server (Python)
+    let pengguna = null;         // akun yang sedang login
+    let filterBulan = 'semua';
+    let filterTahun = 'semua';
+    let tipeAktif = 'pengeluaran';
+    let idDiedit = null;         // id transaksi yang sedang diubah (null = mode tambah baru)
+    let idDetail = null;         // id transaksi yang sedang dibuka di jendela detail
+    const NAMA_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+    // Pendek-pendekan untuk document.getElementById
+    const el = (id) => document.getElementById(id);
+
+    // ---------- 2. FUNGSI BANTU ----------
+    function formatRupiah(angka) {
+      return 'Rp ' + new Intl.NumberFormat('id-ID').format(angka);
+    }
+
+    // Mencegah teks buatan pengguna dibaca sebagai kode HTML
+    function aman(teks) {
+      const d = document.createElement('div');
+      d.textContent = teks;
+      return d.innerHTML;
+    }
+
+    // Transaksi lama (tanpa tanggal/bulan/tahun) memakai waktu pencatatannya (id)
+    const bulanDari = (t) => typeof t.bulan === 'number' ? t.bulan : new Date(t.id).getMonth();
+    const tahunDari = (t) => typeof t.tahun === 'number' ? t.tahun : new Date(t.id).getFullYear();
+    const tanggalDari = (t) => typeof t.tanggal === 'number' ? t.tanggal : new Date(t.id).getDate();
+
+    // Cari satu transaksi berdasarkan id
+    const cari = (id) => transaksi.find(t => String(t.id) === String(id));
+
+    // Waktu pencatatan: transaksi lama (tanpa field "dibuat") memakai id, yang memang berisi waktu pencatatan
+    const waktuDibuat = (t) => t.dibuat || t.id;
+
+    // Format waktu lengkap, contoh: "4 Oktober 2026, 00.51"
+    function formatWaktu(ms) {
+      const d = new Date(ms);
+      const dua = (n) => String(n).padStart(2, '0');
+      return d.getDate() + ' ' + NAMA_BULAN[d.getMonth()] + ' ' + d.getFullYear() +
+             ', ' + dua(d.getHours()) + '.' + dua(d.getMinutes());
+    }
+
+    // Ubah "1000000" -> "1.000.000" (sisipkan titik tiap 3 angka dari kanan)
+    function formatTitik(teksAngka) {
+      return teksAngka.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    // ---------- 3. NOMINAL OTOMATIS BERTITIK ----------
+    // Setiap kali mengetik: buang semua yang bukan angka, lalu pasang titik ribuan.
+    el('nominal').addEventListener('input', (e) => {
+      const kolom = e.target;
+      const nilai = kolom.value;
+      // Hitung ada berapa angka di kiri kursor, supaya kursor tidak melompat
+      const angkaDiKiriKursor = nilai.slice(0, kolom.selectionStart).replace(/\D/g, '').length;
+
+      const bersih = nilai.replace(/\D/g, '').replace(/^0+(?=\d)/, ''); // hanya angka, tanpa nol di depan
+      kolom.value = formatTitik(bersih);
+
+      // Kembalikan kursor ke posisi yang sama (dihitung dari jumlah angka)
+      let hitung = 0, posisi = 0;
+      while (posisi < kolom.value.length && hitung < angkaDiKiriKursor) {
+        if (/\d/.test(kolom.value[posisi])) hitung++;
+        posisi++;
+      }
+      kolom.setSelectionRange(posisi, posisi);
+    });
+
+    // Ambil nominal sebagai angka biasa: "1.500.000" -> 1500000
+    const ambilNominal = () => Number(el('nominal').value.replace(/\./g, ''));
+
+    // ---------- 4. PILIHAN TANGGAL / BULAN / TAHUN ----------
+    function isiPilihanPeriode() {
+      const sekarang = new Date();
+
+      let opsiTanggal = '';
+      for (let d = 1; d <= 31; d++) opsiTanggal += `<option value="${d}">${d}</option>`;
+      const opsiBulan = NAMA_BULAN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+      let opsiTahun = '';
+      for (let y = TAHUN_AWAL; y <= TAHUN_AKHIR; y++) opsiTahun += `<option value="${y}">${y}</option>`;
+      opsiTahun += '<option value="lain">Lainnya</option>'; // pilihan untuk mengetik tahun sendiri
+
+      el('tanggal').innerHTML = opsiTanggal;
+      el('bulan').innerHTML = opsiBulan;
+      el('tahun').innerHTML = opsiTahun;
+      el('tanggal').value = sekarang.getDate();
+      el('bulan').value = sekarang.getMonth();
+      const tahunIni = sekarang.getFullYear();
+      el('tahun').value = (tahunIni >= TAHUN_AWAL && tahunIni <= TAHUN_AKHIR) ? tahunIni : TAHUN_AWAL;
+
+      el('filterBulan').innerHTML = '<option value="semua">Semua bulan</option>' + opsiBulan;
+      el('filterBulan').value = filterBulan;
+    }
+
+    // Pilihan tahun di filter = 2026-2030 + tahun lain yang ada di data. Dipanggil tiap data berubah.
+    function isiFilterTahun() {
+      const daftarTahun = new Set();
+      for (let y = TAHUN_AWAL; y <= TAHUN_AKHIR; y++) daftarTahun.add(y);
+      transaksi.forEach(t => daftarTahun.add(tahunDari(t)));
+      const urut = [...daftarTahun].sort((a, b) => a - b);
+
+      el('filterTahun').innerHTML = '<option value="semua">Semua tahun</option>' +
+        urut.map(y => `<option value="${y}">${y}</option>`).join('');
+      // Pertahankan pilihan filter bila tahunnya masih ada
+      if (filterTahun !== 'semua' && !daftarTahun.has(Number(filterTahun))) filterTahun = 'semua';
+      el('filterTahun').value = filterTahun;
+    }
+
+    // Tampilkan kolom ketik tahun bila "Lainnya" dipilih
+    el('tahun').addEventListener('change', (e) => {
+      const lain = e.target.value === 'lain';
+      el('tahunLain').classList.toggle('hidden', !lain);
+      if (lain) el('tahunLain').focus();
+    });
+
+    // Ambil tahun final: dari pilihan 2026-2030 atau dari kolom ketik sendiri
+    const ambilTahun = () =>
+      el('tahun').value === 'lain' ? Number(el('tahunLain').value) : Number(el('tahun').value);
+
+    // ---------- 5. MENAMPILKAN DATA ----------
+    function render() {
+      // Saldo selalu dari SEMUA transaksi
+      const saldo = transaksi.reduce(
+        (jumlah, t) => jumlah + (t.tipe === 'pemasukan' ? t.nominal : -t.nominal), 0);
+
+      // Transaksi sesuai filter bulan/tahun
+      const periode = transaksi.filter(t =>
+        (filterBulan === 'semua' || bulanDari(t) === Number(filterBulan)) &&
+        (filterTahun === 'semua' || tahunDari(t) === Number(filterTahun)));
+
+      const totalMasuk = periode.filter(t => t.tipe === 'pemasukan').reduce((j, t) => j + t.nominal, 0);
+      const totalKeluar = periode.filter(t => t.tipe === 'pengeluaran').reduce((j, t) => j + t.nominal, 0);
+
+      const namaPeriode = ((filterBulan === 'semua' ? '' : NAMA_BULAN[Number(filterBulan)] + ' ')
+        + (filterTahun === 'semua' ? '' : filterTahun)).trim();
+      const ket = namaPeriode ? ' (' + namaPeriode + ')' : ' (semua)';
+      el('labelMasuk').textContent = 'Pemasukan' + ket;
+      el('labelKeluar').textContent = 'Pengeluaran' + ket;
+
+      el('saldo').textContent = formatRupiah(saldo);
+      el('saldo').className = 'text-3xl font-extrabold mt-1 break-words ' + (saldo < 0 ? 'teks-keluar' : 'teks-utama');
+      el('totalMasuk').textContent = formatRupiah(totalMasuk);
+      el('totalKeluar').textContent = formatRupiah(totalKeluar);
+
+      const terurut = [...periode].sort((a, b) =>
+        (tahunDari(b) - tahunDari(a)) || (bulanDari(b) - bulanDari(a)) ||
+        (tanggalDari(b) - tanggalDari(a)) || (b.id - a.id));
+
+      el('daftar').innerHTML = terurut.map(t => {
+        const masuk = t.tipe === 'pemasukan';
+        // Baris atas bisa diklik = lihat detail. Baris bawah = tombol Ubah & Hapus.
+        return `
+          <li class="rounded-xl bg-kartu border garis-warna p-3">
+            <button type="button" data-id="${t.id}" aria-label="Lihat detail ${aman(t.judul)}"
+              class="btn-detail w-full flex items-center gap-3 text-left">
+              <div class="w-1 self-stretch rounded-full ${masuk ? 'bg-masuk' : 'bg-keluar'}"></div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold teks-utama truncate">${aman(t.judul)}</p>
+                <p class="text-xs teks-sunyi">${aman(t.kategori)} &middot; ${tanggalDari(t)} ${NAMA_BULAN[bulanDari(t)]} ${tahunDari(t)}</p>
+                <p class="text-xs teks-sunyi">Dicatat ${formatWaktu(waktuDibuat(t))}${t.diubah ? ' &middot; diubah' : ''}</p>
+              </div>
+              <p class="font-bold whitespace-nowrap ${masuk ? 'teks-masuk' : 'teks-keluar'}">
+                ${masuk ? '+' : '-'}${formatRupiah(t.nominal)}
+              </p>
+            </button>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="button" data-id="${t.id}" aria-label="Ubah ${aman(t.judul)}"
+                class="btn-ubah min-h-[44px] px-4 rounded-lg text-sm teks-redup border garis-warna hover-utama transition">Ubah</button>
+              <button type="button" data-id="${t.id}" aria-label="Hapus ${aman(t.judul)}"
+                class="btn-hapus min-h-[44px] px-4 rounded-lg text-sm teks-redup border garis-warna hover-keluar transition">Hapus</button>
+            </div>
+          </li>`;
+      }).join('');
+
+      isiDetail(); // bila jendela detail sedang terbuka, segarkan isinya
+
+      el('kosong').textContent = transaksi.length === 0
+        ? 'Belum ada transaksi. Isi formulir di atas untuk mencatat yang pertama.'
+        : 'Tidak ada transaksi pada periode ini.';
+      el('kosong').classList.toggle('hidden', periode.length > 0);
+    }
+
+    // ---------- 6. FORMULIR ----------
+    function aturTipe(tipe) {
+      tipeAktif = tipe;
+      const aktifMasuk = 'bg-masuk teks-tombol';
+      const aktifKeluar = 'bg-keluar teks-tombol';
+      const mati = 'teks-redup';
+
+      el('btnPemasukan').className = 'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pemasukan' ? aktifMasuk : mati);
+      el('btnPengeluaran').className = 'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pengeluaran' ? aktifKeluar : mati);
+      el('btnSimpan').className = 'w-full min-h-[52px] rounded-xl font-bold teks-tombol transition active:scale-[0.98] '
+        + (tipe === 'pemasukan' ? 'bg-masuk' : 'bg-keluar');
+
+      el('kategori').value = tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran';
+      el('judul').placeholder = tipe === 'pemasukan'
+        ? 'Contoh: Uang jajan / kiriman orang tua'
+        : 'Contoh: Makan siang warteg';
+    }
+
+    document.querySelectorAll('.tipe-btn').forEach(btn => {
+      btn.addEventListener('click', () => aturTipe(btn.dataset.tipe));
+    });
+    el('kategori').addEventListener('change', (e) => {
+      aturTipe(e.target.value === 'Pemasukan' ? 'pemasukan' : 'pengeluaran');
+    });
+
+    function tampilError(pesan) {
+      el('pesanError').textContent = pesan;
+      el('pesanError').classList.toggle('hidden', !pesan);
+      if (pesan) el('pesanError').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    // Penanda status penyimpanan di bawah header
+    function aturStatusCloud(status) {
+      const teks = {
+        menyimpan: '\u23F3 Menyimpan ke server...',
+        tersimpan: '\u2705 Tersimpan di server',
+        gagal: '\u26A0\uFE0F Gagal tersambung ke server. Perubahan terakhir belum tersimpan.',
+        kosong: ''
+      }[status];
+      el('statusCloud').textContent = teks;
+      el('statusCloud').className = 'mb-4 text-xs ' +
+        (status === 'tersimpan' ? 'teks-masuk' : status === 'gagal' ? 'teks-keluar' : 'teks-sunyi');
+    }
+
+
+    // Saat formulir dikirim (tambah baru ATAU simpan perubahan)
+    el('formTransaksi').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const judul = el('judul').value.trim();
+      const nominal = ambilNominal();
+      const tanggal = Number(el('tanggal').value);
+      const bulan = Number(el('bulan').value);
+      const tahun = ambilTahun();
+
+      if (!judul) return tampilError('Judul transaksi belum diisi.');
+      if (!nominal || nominal <= 0) return tampilError('Nominal harus lebih dari 0.');
+      if (!Number.isInteger(tahun) || tahun < 1900 || tahun > 2100) {
+        return tampilError('Tahun harus berupa angka antara 1900 dan 2100.');
+      }
+      // Cek tanggal ada di kalender (31 Februari tidak ada)
+      if (new Date(tahun, bulan, tanggal).getMonth() !== bulan) {
+        return tampilError('Tanggal ' + tanggal + ' tidak ada di bulan ' + NAMA_BULAN[bulan] + ' ' + tahun + '.');
+      }
+      tampilError('');
+
+      // Mode ubah: pakai id lama. Mode tambah: id baru = waktu saat ini (milidetik), sekaligus nomor unik.
+      const lama = idDiedit ? cari(idDiedit) : null;
+      if (idDiedit && !lama) {
+        keluarModeUbah();
+        return tampilError('Transaksi yang sedang diubah sudah tidak ada (mungkin dihapus dari perangkat lain).');
+      }
+      const id = lama ? lama.id : Date.now();
+      const data = {
+        id: id,
+        judul: judul,
+        nominal: nominal,
+        kategori: el('kategori').value,
+        tanggal: tanggal,
+        bulan: bulan,
+        tahun: tahun,
+        tipe: tipeAktif,
+        dibuat: lama ? waktuDibuat(lama) : id   // waktu pencatatan tidak berubah saat transaksi diedit
+      };
+      if (lama) data.diubah = Date.now();       // waktu terakhir diubah
+
+      try {
+        aturStatusCloud('menyimpan');
+        // POST = tambah baru, PUT = simpan perubahan. Server yang memeriksa ulang datanya.
+        if (lama) await api('PUT', '/api/transaksi/' + id, data);
+        else await api('POST', '/api/transaksi', data);
+        await muatTransaksi();
+      } catch (err) {
+        aturStatusCloud('gagal');
+        return tampilError(err.message);
+      }
+
+      if (lama) {
+        keluarModeUbah(); // kembali ke mode tambah, formulir dikosongkan
+      } else {
+        el('judul').value = '';
+        el('nominal').value = '';
+        el('judul').focus();
+      }
+    });
+
+    // ---------- UBAH (UPDATE) ----------
+    function aturTanggalHariIni() {
+      const s = new Date();
+      el('tanggal').value = s.getDate();
+      el('bulan').value = s.getMonth();
+      const y = s.getFullYear();
+      el('tahun').value = (y >= TAHUN_AWAL && y <= TAHUN_AKHIR) ? y : TAHUN_AWAL;
+      el('tahunLain').classList.add('hidden');
+      el('tahunLain').value = '';
+    }
+
+    // Isi formulir dengan data transaksi, lalu ubah tampilan menjadi "mode ubah"
+    function mulaiUbah(id) {
+      const t = cari(id);
+      if (!t) return;
+      tutupDetail();
+      idDiedit = t.id;
+      aturTipe(t.tipe);
+      el('judul').value = t.judul;
+      el('nominal').value = formatTitik(String(t.nominal));
+      el('tanggal').value = tanggalDari(t);
+      el('bulan').value = bulanDari(t);
+      const y = tahunDari(t);
+      if (y >= TAHUN_AWAL && y <= TAHUN_AKHIR) {
+        el('tahun').value = y;
+        el('tahunLain').classList.add('hidden');
+        el('tahunLain').value = '';
+      } else {
+        el('tahun').value = 'lain';          // tahun di luar 2026-2030 -> pakai kolom ketik sendiri
+        el('tahunLain').value = y;
+        el('tahunLain').classList.remove('hidden');
+      }
+      el('judulForm').textContent = 'Ubah transaksi';
+      el('btnSimpan').textContent = 'Simpan perubahan';
+      el('btnBatal').classList.remove('hidden');
+      tampilError('');
+      el('formTransaksi').scrollIntoView({ block: 'start', behavior: 'smooth' });
+      el('judul').focus({ preventScroll: true });
+    }
+
+    // Kembali ke mode tambah baru
+    function keluarModeUbah() {
+      idDiedit = null;
+      el('judulForm').textContent = 'Catat transaksi';
+      el('btnSimpan').textContent = 'Simpan transaksi';
+      el('btnBatal').classList.add('hidden');
+      el('judul').value = '';
+      el('nominal').value = '';
+      aturTanggalHariIni();
+      aturTipe('pengeluaran');
+      tampilError('');
+    }
+    el('btnBatal').addEventListener('click', keluarModeUbah);
+
+    // ---------- DETAIL (READ) ----------
+    function bukaDetail(id) {
+      idDetail = id;
+      isiDetail();
+    }
+
+    function tutupDetail() {
+      idDetail = null;
+      el('modalDetail').classList.add('hidden');
+    }
+
+    // Isi jendela detail dari data terbaru; tutup bila transaksinya sudah tidak ada
+    function isiDetail() {
+      if (idDetail === null) return;
+      const t = cari(idDetail);
+      if (!t) return tutupDetail();
+      const masuk = t.tipe === 'pemasukan';
+      const baris = (nama, nilai) =>
+        `<div><dt class="teks-sunyi">${nama}</dt><dd class="teks-utama break-words">${nilai}</dd></div>`;
+
+      el('detailJudul').textContent = t.judul;
+      el('detailNominal').textContent = (masuk ? '+' : '-') + formatRupiah(t.nominal);
+      el('detailNominal').className = 'text-2xl font-extrabold mt-2 break-words ' + (masuk ? 'teks-masuk' : 'teks-keluar');
+      el('detailIsi').innerHTML =
+        baris('Jenis', masuk ? 'Pemasukan' : 'Pengeluaran') +
+        baris('Kategori', aman(t.kategori)) +
+        baris('Tanggal transaksi', tanggalDari(t) + ' ' + NAMA_BULAN[bulanDari(t)] + ' ' + tahunDari(t)) +
+        baris('Dicatat pada', formatWaktu(waktuDibuat(t))) +
+        (t.diubah ? baris('Terakhir diubah', formatWaktu(t.diubah)) : '');
+      el('modalDetail').classList.remove('hidden');
+    }
+
+    el('detailTutup').addEventListener('click', tutupDetail);
+    el('modalDetail').addEventListener('click', (e) => { if (e.target === el('modalDetail')) tutupDetail(); }); // klik area gelap
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') tutupDetail(); });
+    el('detailUbah').addEventListener('click', () => mulaiUbah(idDetail));
+    el('detailHapus').addEventListener('click', () => hapusTransaksi(idDetail));
+
+    // ---------- JAM BERJALAN ----------
+    function perbaruiJam() {
+      const s = new Date();
+      const dua = (n) => String(n).padStart(2, '0');
+      el('jamLive').textContent = 'Sekarang: ' + NAMA_HARI[s.getDay()] + ', ' + s.getDate() + ' ' +
+        NAMA_BULAN[s.getMonth()] + ' ' + s.getFullYear() + ' \u00B7 ' +
+        dua(s.getHours()) + '.' + dua(s.getMinutes()) + '.' + dua(s.getSeconds());
+    }
+    perbaruiJam();
+    setInterval(perbaruiJam, 1000);
+
+    // Filter riwayat
+    el('filterBulan').addEventListener('change', (e) => { filterBulan = e.target.value; render(); });
+    el('filterTahun').addEventListener('change', (e) => { filterTahun = e.target.value; render(); });
+
+    // ---------- HAPUS (DELETE) ----------
+    async function hapusTransaksi(id) {
+      const t = cari(id);
+      if (!t) return;
+      if (!confirm('Hapus transaksi "' + t.judul + '"? Tindakan ini tidak bisa dibatalkan.')) return;
+      try {
+        aturStatusCloud('menyimpan');
+        await api('DELETE', '/api/transaksi/' + id);
+        await muatTransaksi();
+        if (String(idDiedit) === String(id)) keluarModeUbah(); // yang sedang diubah ikut dihapus
+        if (String(idDetail) === String(id)) tutupDetail();
+      } catch (err) {
+        aturStatusCloud('gagal');
+        tampilError(err.message);
+      }
+    }
+
+    // Satu pendengar untuk semua tombol di daftar (detail / ubah / hapus)
+    el('daftar').addEventListener('click', (e) => {
+      const detail = e.target.closest('.btn-detail');
+      const ubah = e.target.closest('.btn-ubah');
+      const hapus = e.target.closest('.btn-hapus');
+      if (detail) bukaDetail(detail.dataset.id);
+      else if (ubah) mulaiUbah(ubah.dataset.id);
+      else if (hapus) hapusTransaksi(hapus.dataset.id);
+    });
+
+    // ---------- 7. DAFTAR & MASUK (dikirim ke backend Python) ----------
+    function tampilLayar(nama) {
+      el('layarMuat').classList.toggle('hidden', nama !== 'muat');
+      el('layarLogin').classList.toggle('hidden', nama !== 'login');
+      el('layarApp').classList.toggle('hidden', nama !== 'app');
+    }
+
+    let modeDaftar = false;
+    function aturModeLogin(daftar) {
+      modeDaftar = daftar;
+      el('judulLogin').textContent = daftar ? 'Buat akun baru' : 'Masuk dulu';
+      el('btnMasuk').textContent = daftar ? 'Daftar' : 'Masuk';
+      el('btnGantiMode').textContent = daftar ? 'Sudah punya akun? Masuk' : 'Belum punya akun? Daftar';
+      el('inSandi').setAttribute('autocomplete', daftar ? 'new-password' : 'current-password');
+      el('pesanLogin').classList.add('hidden');
+    }
+    el('btnGantiMode').addEventListener('click', () => aturModeLogin(!modeDaftar));
+
+    el('formLogin').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      el('pesanLogin').classList.add('hidden');
+      el('btnMasuk').disabled = true;
+      try {
+        const hasil = await api('POST', modeDaftar ? '/api/daftar' : '/api/masuk', {
+          username: el('inUser').value.trim(),
+          sandi: el('inSandi').value
+        });
+        el('inSandi').value = '';
+        await masukKeAplikasi(hasil.pengguna);
+      } catch (err) {
+        el('pesanLogin').textContent = err.message;
+        el('pesanLogin').classList.remove('hidden');
+      } finally {
+        el('btnMasuk').disabled = false;
+      }
+    });
+
+    async function masukKeAplikasi(user) {
+      pengguna = user;
+      el('infoAkun').textContent = 'Masuk sebagai ' + user.username;
+      tampilLayar('app');
+      try {
+        await muatTransaksi();
+      } catch (err) {
+        aturStatusCloud('gagal');
+        el('pesanCloud').textContent = err.message;
+        el('pesanCloud').classList.remove('hidden');
+      }
+    }
+
+    el('btnKeluar').addEventListener('click', async () => {
+      try { await api('POST', '/api/keluar'); } catch (e) { /* tetap keluar di layar */ }
+      pengguna = null;
+      transaksi = [];
+      tutupDetail();
+      keluarModeUbah();
+      aturStatusCloud('kosong');
+      aturModeLogin(false);
+      tampilLayar('login');
+    });
+
+    // ---------- 8. MEMBACA DATA DARI SERVER (READ) ----------
+    // Dipanggil setelah login dan setiap selesai tambah / ubah / hapus.
+    async function muatTransaksi() {
+      const hasil = await api('GET', '/api/transaksi');
+      transaksi = hasil.transaksi;
+      el('pesanCloud').classList.add('hidden');
+      aturStatusCloud('tersimpan');
+      isiFilterTahun();
+      render();
+    }
+
+    // ---------- 9. TEMA GELAP / TERANG ----------
+    const KUNCI_TEMA = 'tema-aplikasi';
+
+    function terapkanTema(tema, simpan) {
+      document.documentElement.setAttribute('data-tema', tema); // CSS membaca atribut ini
+      // Warna bilah browser di HP ikut berubah
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', tema === 'terang' ? '#f8fafc' : '#0f172a');
+      // Tombol menampilkan tema TUJUAN
+      document.querySelectorAll('.btn-tema').forEach(tombol => {
+        tombol.textContent = tema === 'terang' ? '\u{1F319} Gelap' : '\u2600\uFE0F Terang';
+        tombol.setAttribute('aria-label', tema === 'terang' ? 'Ganti ke tema gelap' : 'Ganti ke tema terang');
+      });
+      if (simpan) {
+        try { localStorage.setItem(KUNCI_TEMA, tema); } catch (e) { /* abaikan bila diblokir */ }
+      }
+    }
+
+    document.querySelectorAll('.btn-tema').forEach(tombol => {
+      tombol.addEventListener('click', () => {
+        const sekarang = document.documentElement.getAttribute('data-tema');
+        terapkanTema(sekarang === 'terang' ? 'gelap' : 'terang', true);
+      });
+    });
+
+    // Terapkan tema yang sudah dipasang skrip di <head> (tanpa menyimpan ulang)
+    terapkanTema(document.documentElement.getAttribute('data-tema') === 'terang' ? 'terang' : 'gelap', false);
+
+    // ---------- 10. MULAI ----------
+    isiPilihanPeriode();
+    aturTipe('pengeluaran');
+    (async () => {
+      try {
+        const hasil = await api('GET', '/api/saya');   // masih login dari kunjungan sebelumnya?
+        await masukKeAplikasi(hasil.pengguna);
+      } catch (err) {
+        if (err.kode === 'jaringan') {
+          el('pesanLogin').textContent = err.message;
+          el('pesanLogin').classList.remove('hidden');
+        }
+        tampilLayar('login');
+      }
+    })();
+  </script>
+</body>
+</html>
